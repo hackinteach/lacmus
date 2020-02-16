@@ -22,6 +22,7 @@ import time
 import classify
 import tflite_runtime.interpreter as tflite
 import platform
+from PIL import Image
 
 EDGETPU_SHARED_LIB = {
   'Linux': 'libedgetpu.so.1',
@@ -80,8 +81,8 @@ def preprocess_image_tpu(image):
     image, _ = resize_image(image, min_side=1500, max_side=2000)
 
 def predict_image_tpu(image):
-    labels = load_labels('labels.txt')
-    interpreter = make_interpreter(os.path.join('snapshots', 'resnet50_liza_alert_v1_interface.h5'))
+    labels = load_labels(os.path.join('snapshots', 'labels.txt'))
+    interpreter = make_interpreter(os.path.join('snapshots', 'output_tflite_graph_edgetpu.tflite'))
     interpreter.allocate_tensors()
     classify.set_input(interpreter, image)
     start = time.perf_counter()
@@ -101,7 +102,7 @@ def run_detection_image(model, labels_to_names, data):
             imgdata = pybase64.b64decode(data)
             file_bytes = np.asarray(bytearray(imgdata), dtype=np.uint8)
             image = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
-
+            
             image_tpu = cv2.imread('snapshots/p1.jpg')
             predict_image_tpu(image_tpu)
 
