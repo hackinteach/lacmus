@@ -81,9 +81,9 @@ def preprocess_image_tpu(image):
     image, _ = resize_image(image, min_side=1500, max_side=2000)
 
 def predict_image_tpu(image):
-    labels = load_labels(os.path.join('snapshots', 'labels.txt'))
-    interpreter = make_interpreter(os.path.join('snapshots', 'output_tflite_graph_edgetpu.tflite'))
-    interpreter.allocate_tensors()
+    labels = {0: 'background', 1: 'pedestrian'}
+    #interpreter = make_interpreter(os.path.join('snapshots', 'output_tflite_graph_edgetpu.tflite'))
+    #interpreter.allocate_tensors()
     classify.set_input(interpreter, image)
     start = time.perf_counter()
     interpreter.invoke()
@@ -102,7 +102,7 @@ def run_detection_image(model, labels_to_names, data):
             imgdata = pybase64.b64decode(data)
             file_bytes = np.asarray(bytearray(imgdata), dtype=np.uint8)
             image = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
-            
+
             image_tpu = cv2.imread('snapshots/p1.jpg')
             predict_image_tpu(image_tpu)
 
@@ -146,6 +146,7 @@ def load_model(args):
     global model
     global labels_to_names
     global graph
+    global interpreter
 
     sess = tf.InteractiveSession()
     graph = tf.get_default_graph()
@@ -153,7 +154,10 @@ def load_model(args):
     model_path = args.model
     model = models.load_model(model_path, backbone_name='resnet50')
     labels_to_names = {0: 'Pedestrian'}
-    return model, labels_to_names
+
+    interpreter = make_interpreter(os.path.join('snapshots', 'output_tflite_graph_edgetpu.tflite'))
+    interpreter.allocate_tensors()
+    return model, labels_to_names, interpreter
 
 def parse_args(args):
     """ Parse the arguments.
