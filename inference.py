@@ -18,6 +18,48 @@ import time
 import json
 from flask import Flask, jsonify, request, abort
 
+import time
+import classify
+import tflite_runtime.interpreter as tflite
+import platform
+
+EDGETPU_SHARED_LIB = {
+  'Linux': 'libedgetpu.so.1',
+  'Darwin': 'libedgetpu.1.dylib',
+  'Windows': 'edgetpu.dll'
+}[platform.system()]
+
+
+def load_labels(path, encoding='utf-8'):
+  """Loads labels from file (with or without index numbers).
+
+  Args:
+    path: path to label file.
+    encoding: label file encoding.
+  Returns:
+    Dictionary mapping indices to labels.
+  """
+  with open(path, 'r', encoding=encoding) as f:
+    lines = f.readlines()
+    if not lines:
+      return {}
+
+    if lines[0].split(' ', maxsplit=1)[0].isdigit():
+      pairs = [line.split(' ', maxsplit=1) for line in lines]
+      return {int(index): label.strip() for index, label in pairs}
+    else:
+      return {index: line.strip() for index, line in enumerate(lines)}
+
+
+def make_interpreter(model_file):
+  model_file, *device = model_file.split('@')
+  return tflite.Interpreter(
+      model_path=model_file,
+      experimental_delegates=[
+          tflite.load_delegate(EDGETPU_SHARED_LIB,
+                               {'device': device[0]} if device else {})
+      ])
+
 app = Flask(__name__)
 
 @app.route('/')
@@ -33,6 +75,23 @@ def predict_image():
     caption = run_detection_image(model, labels_to_names, request.json['data'])
     return caption, 200
 
+def preprocess_image_tpu(image):
+    image = preprocess_image(image)
+    image, _ = resize_image(image, min_side=1500, max_side=2000)
+
+def predict_image_tpu():
+    labels = load_labels('labels.txt')
+    interpreter = make_interpreter(args.model)
+    interpreter.allocate_tensors()
+    classify.set_input(interpreter, image)
+    start = time.perf_counter()
+    interpreter.invoke()
+    inference_time = time.perf_counter() - start
+    classes = classify.get_output(interpreter, args.top_k, args.threshold)
+    print('%.1fms' % (inference_time * 1000))
+    for klass in classes:
+        print('%s: %.5f' % (labels.get(klass.id, klass.id), klass.score))
+        return labels.get(klass.id, klass.id), klass.score
 
 def run_detection_image(model, labels_to_names, data):
     print("start predict...")
