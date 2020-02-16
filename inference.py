@@ -79,15 +79,15 @@ def preprocess_image_tpu(image):
     image = preprocess_image(image)
     image, _ = resize_image(image, min_side=1500, max_side=2000)
 
-def predict_image_tpu():
+def predict_image_tpu(image):
     labels = load_labels('labels.txt')
-    interpreter = make_interpreter(args.model)
+    interpreter = make_interpreter(os.path.join('snapshots', 'resnet50_liza_alert_v1_interface.h5'))
     interpreter.allocate_tensors()
     classify.set_input(interpreter, image)
     start = time.perf_counter()
     interpreter.invoke()
     inference_time = time.perf_counter() - start
-    classes = classify.get_output(interpreter, args.top_k, args.threshold)
+    classes = classify.get_output(interpreter, 1, 0.3)
     print('%.1fms' % (inference_time * 1000))
     for klass in classes:
         print('%s: %.5f' % (labels.get(klass.id, klass.id), klass.score))
@@ -101,6 +101,9 @@ def run_detection_image(model, labels_to_names, data):
             imgdata = pybase64.b64decode(data)
             file_bytes = np.asarray(bytearray(imgdata), dtype=np.uint8)
             image = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
+
+            image_tpu = cv2.imread('snapshots/p1.jpg')
+            predict_image_tpu(image_tpu)
 
             # preprocess image for network
             image = preprocess_image(image)
