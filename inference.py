@@ -94,6 +94,19 @@ def predict_image_tpu(image):
         print('%s: %.5f' % (labels.get(klass.id, klass.id), klass.score))
         return labels.get(klass.id, klass.id), klass.score
 
+def get_crops(img):
+    height, width, _ = img.shape
+    crop_size=224
+    crop_list=[]
+    cnt=0
+    for yi in range(width // 224):
+        for xi in range(height // 224):
+            cnt+=1
+            crop = img[crop_size*yi:crop_size*(yi+1),crop_size*xi:(crop_size)*(xi+1)]
+            if crop.shape[0]==crop_size and crop.shape[1]==crop_size:
+                crop_list.append(crop)
+    return crop_list
+
 def run_detection_image(model, labels_to_names, data):
     print("start predict...")
     start_time = time.time()
@@ -103,8 +116,16 @@ def run_detection_image(model, labels_to_names, data):
             file_bytes = np.asarray(bytearray(imgdata), dtype=np.uint8)
             image = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
 
-            image_tpu = cv2.imread('snapshots/p1.jpg')
-            predict_image_tpu(image_tpu)
+            start = time.perf_counter()
+            image_tpu, _ = resize_image(image, min_side=800, max_side=1333)
+            crop_list = get_crops(image_tpu)
+            for crop in crop_list:
+                l_id, score = predict_image_tpu(crop)
+                if l_id == 'pedestrian':
+                    print('condidate is found: {}'.format(score))
+                    break
+            inference_time = time.perf_counter() - start
+            print('total tpu time - %.1fms' % (inference_time * 1000))
 
             # preprocess image for network
             image = preprocess_image(image)
