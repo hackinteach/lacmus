@@ -144,7 +144,7 @@ def create_models(backbone_retinanet,
             'regression': regression_weight,
             'classification': classification_weight
         },
-        optimizer=keras.optimizers.adam(lr=lr, clipnorm=optimizer_clipnorm)
+        optimizer=keras.optimizers.Adam(lr=lr, clipnorm=optimizer_clipnorm)
     )
 
     return model, training_model, prediction_model
